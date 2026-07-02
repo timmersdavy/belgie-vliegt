@@ -42,6 +42,14 @@ nav.dark{background:rgba(8,8,8,0.92);backdrop-filter:blur(20px);border-bottom:1p
 .radar-wrap{position:relative;height:600px;border-top:1px solid rgba(200,151,42,0.1);border-bottom:1px solid rgba(200,151,42,0.1)}
 .radar-wrap iframe{width:100%;height:100%;border:none;display:block}
 .radar-overlay-br{position:absolute;bottom:20px;right:20px;z-index:10;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(200,151,42,0.4);pointer-events:none}
+.vliegzoek-wrap{position:absolute;top:16px;left:16px;z-index:500;display:flex;flex-direction:column;gap:7px;max-width:min(340px,62vw)}
+#vliegzoek{background:rgba(8,8,8,0.9);border:1px solid rgba(200,151,42,0.4);color:#fff;padding:10px 14px;border-radius:6px;font-family:"DM Sans",sans-serif;font-size:13px;width:100%;outline:none}
+#vliegzoek::placeholder{color:rgba(255,255,255,0.35)}
+#vliegzoek:focus{border-color:var(--gold)}
+.zoekchips{display:flex;flex-wrap:wrap;gap:5px}
+.zoekchip{background:rgba(8,8,8,0.8);border:1px solid rgba(200,151,42,0.3);color:var(--gold);font-size:10px;padding:4px 9px;border-radius:20px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:background .2s}
+.zoekchip:hover{background:rgba(200,151,42,0.22)}
+.zoekinfo{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);opacity:.85;padding-left:2px;min-height:12px}
 
 .airports{padding:120px 80px;background:var(--black);border-top:1px solid rgba(200,151,42,0.07)}
 .sec-pre{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:12px}
@@ -153,6 +161,16 @@ footer{padding:56px 80px;border-top:1px solid rgba(200,151,42,0.07);display:flex
   <div class="radar-wrap" id="radar-wrap" style="height:620px">
     <div id="kaart" style="width:100%;height:100%"></div>
     <div class="radar-overlay-br">Kaart: OpenStreetMap · Live data: OpenSky Network · ververst elke 30s</div>
+    <div class="vliegzoek-wrap">
+      <input id="vliegzoek" type="text" placeholder="Zoek vlucht, type of luchtmacht… (bv. RCH)" autocomplete="off" spellcheck="false">
+      <div class="zoekchips">
+        <span class="zoekchip" data-q="RCH">🇺🇸 VS luchtmacht</span>
+        <span class="zoekchip" data-q="BAF">🇧🇪 Belgische LM</span>
+        <span class="zoekchip" data-q="navo">🛡 NAVO</span>
+        <span class="zoekchip" data-q="F16">F-16</span>
+      </div>
+      <div class="zoekinfo" id="zoekinfo"></div>
+    </div>
     <div style="position:absolute;top:16px;right:16px;z-index:500;background:rgba(8,8,8,0.85);border:1px solid rgba(200,151,42,0.3);padding:8px 16px;border-radius:6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold)" id="vluchtteller">vluchten laden...</div>
   </div>
 </section>
@@ -714,12 +732,17 @@ function stopLezen(){
           }
           var id=s.hex||call;
           gezien[id]=true;
+          var zoekT=maakZoek(call,s.t,s.r,type);
           if(vliegMarkers[id]){
             vliegMarkers[id].setLatLng([lat,lon]);
             vliegMarkers[id].setIcon(icn);
+            vliegMarkers[id]._zoek=zoekT;
+            pasEen(vliegMarkers[id]);
           } else {
+            m._zoek=zoekT;
             vliegCluster.addLayer(m);
             vliegMarkers[id]=m;
+            pasEen(m);
           }
         });
         // Verwijder verdwenen vliegtuigen
@@ -727,6 +750,7 @@ function stopLezen(){
           if(!gezien[k]){vliegCluster.removeLayer(vliegMarkers[k]);delete vliegMarkers[k];}
         });
         document.getElementById('vluchtteller').textContent=Object.keys(vliegMarkers).length+' vliegtuigen boven België';
+        pasAlles();
       }).catch(function(){});
   }
   laadVluchten();
@@ -764,17 +788,23 @@ function stopLezen(){
           +'</div></div>';
 
         gezien[hex]=true;
+        var zoekT=maakZoek(call,s.t,s.r,'militair leger '+type);
         if(milMarkers[hex]){
           milMarkers[hex].setLatLng([lat,lon]);
           milMarkers[hex].setIcon(icn);
+          milMarkers[hex]._zoek=zoekT;
+          pasEen(milMarkers[hex]);
         } else {
           var m=L.marker([lat,lon],{icon:icn}).addTo(map).bindPopup(popHtml,{maxWidth:240});
+          m._zoek=zoekT;
           milMarkers[hex]=m;
+          pasEen(m);
         }
       });
       Object.keys(milMarkers).forEach(function(k){
         if(!gezien[k]){map.removeLayer(milMarkers[k]);delete milMarkers[k];}
       });
+      pasAlles();
     }).catch(function(){});
   }
   laadMilitair();
@@ -823,6 +853,58 @@ function stopLezen(){
     L.polyline(r.pts,{color:'#C8972A',weight:2,opacity:0.6,dashArray:'6 4'}).addTo(map)
      .bindPopup('<span style="font-size:12px;color:#C8972A">'+r.naam+'</span>');
   });
+
+  // ---- Zoekbalk: filter live vliegtuigen op callsign, type of luchtmacht ----
+  function normZoek(s){return (s||'').toLowerCase().replace(/[\s\-]/g,'');}
+  function landVanCallsign(call){
+    var c=(call||'').toUpperCase(), tabel=[
+      ['RCH','amerikaanse luchtmacht usaf verenigde staten amerika reach'],
+      ['BAF','belgische luchtmacht belgie'],
+      ['NATO','navo nato'],['MMF','navo nato tanker'],['MRTT','navo nato tanker'],
+      ['RRR','britse luchtmacht raf verenigd koninkrijk'],
+      ['GAF','duitse luchtmacht luftwaffe duitsland'],
+      ['FAF','franse luchtmacht frankrijk'],
+      ['NAF','nederlandse luchtmacht nederland'],
+      ['CFC','canadese luchtmacht canada'],
+      ['IAM','italiaanse luchtmacht italie'],
+      ['PLF','poolse luchtmacht polen'],
+      ['RYR','ryanair'],['TUI','tui fly'],['DLH','lufthansa'],['KLM','klm'],
+      ['EZY','easyjet'],['DAL','delta'],['UAE','emirates'],['AFR','air france'],
+      ['BAW','british airways'],['TAP','tap portugal'],['ETD','etihad']
+    ], res='';
+    for(var i=0;i<tabel.length;i++){ if(c.indexOf(tabel[i][0])===0){res+=' '+tabel[i][1];} }
+    return res;
+  }
+  function maakZoek(call,tcode,reg,extra){
+    return normZoek((call||'')+' '+(tcode||'')+' '+(reg||'')+' '+landVanCallsign(call)+' '+(extra||''));
+  }
+  function pasEen(m){
+    if(!m)return false;
+    var q=window.zoekTerm||'';
+    var toon=(!q)||(m._zoek&&m._zoek.indexOf(q)!==-1);
+    if(toon){ if(!map.hasLayer(m)) m.addTo(map); }
+    else { if(map.hasLayer(m)) map.removeLayer(m); }
+    return toon;
+  }
+  function pasAlles(){
+    var q=window.zoekTerm||'', totaal=0, getoond=0;
+    function doe(dict){Object.keys(dict).forEach(function(k){totaal++; if(pasEen(dict[k]))getoond++;});}
+    doe(vliegMarkers); doe(milMarkers);
+    var info=document.getElementById('zoekinfo');
+    if(info) info.textContent = q ? (getoond+' van '+totaal+' getoond') : '';
+  }
+  window.zoekTerm='';
+  (function(){
+    var inp=document.getElementById('vliegzoek');
+    if(inp) inp.addEventListener('input',function(){window.zoekTerm=normZoek(inp.value);pasAlles();});
+    document.querySelectorAll('.zoekchip').forEach(function(c){
+      c.addEventListener('click',function(){
+        if(inp) inp.value=c.dataset.q;
+        window.zoekTerm=normZoek(c.dataset.q);
+        pasAlles();
+      });
+    });
+  })();
 })();
 
 var lezing=false;
