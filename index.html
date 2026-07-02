@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>België Vliegt — Vluchten, Radar & Toestellen</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@200;300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--gold:#C8972A;--gold2:#e8b84b;--black:#080808;--white:#f5f5f7}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--white);font-family:"DM Sans",sans-serif;font-weight:300;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:500;padding:0 56px;height:60px;display:flex;align-items:center;justify-content:space-between;transition:background .5s}
+nav.dark{background:rgba(8,8,8,0.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(200,151,42,0.1)}
+.nbrand{font-family:"Bebas Neue",sans-serif;font-size:20px;letter-spacing:6px;text-decoration:none;color:var(--gold)}
+.nlinks{display:flex;gap:36px;list-style:none}
+.nlinks a{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);text-decoration:none;transition:color .2s}
+.nlinks a:hover{color:var(--gold)}
+
+.hero{position:relative;height:100vh;overflow:hidden;display:flex;align-items:flex-end;justify-content:flex-start}
+.hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(0.55) saturate(1.15)}
+.hero-overlay{position:absolute;inset:0;z-index:1;background:linear-gradient(to right,rgba(8,8,8,0.9) 0%,rgba(8,8,8,0.4) 60%,transparent 100%),linear-gradient(to top,rgba(8,8,8,1) 0%,transparent 40%)}
+.hero-content{position:relative;z-index:5;padding:0 80px 100px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(200,151,42,0.3);padding:6px 18px;border-radius:40px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:24px;opacity:.85}
+.bdot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+@keyframes gpspulse{0%{transform:scale(1);opacity:.6}70%{transform:scale(3);opacity:0}100%{transform:scale(3);opacity:0}}
+@keyframes gpspulse2{0%{transform:scale(1);opacity:.4}70%{transform:scale(2);opacity:0}100%{transform:scale(2);opacity:0}}
+.hero-title{font-family:"Bebas Neue",sans-serif;font-size:clamp(80px,16vw,220px);line-height:.85;letter-spacing:-4px;color:#fff;margin-bottom:20px}
+.hero-title span{color:var(--gold)}
+.hero-sub{font-size:16px;color:rgba(255,255,255,0.35);max-width:480px;line-height:1.8;font-weight:200}
+.hero-humor{margin-top:12px;font-size:13px;color:var(--gold);opacity:.7;font-style:italic}
+
+.radarsec{background:var(--black);padding:0}
+.radar-hdr{padding:80px 80px 40px}
+.radar-pre{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:12px}
+.radar-title{font-family:"Bebas Neue",sans-serif;font-size:clamp(56px,8vw,110px);line-height:.9;letter-spacing:-2px;color:#fff}
+.radar-sub{font-size:14px;color:rgba(255,255,255,.3);margin-top:16px;line-height:1.8;max-width:600px}
+.radar-wrap{position:relative;height:600px;border-top:1px solid rgba(200,151,42,0.1);border-bottom:1px solid rgba(200,151,42,0.1)}
+.radar-wrap iframe{width:100%;height:100%;border:none;display:block}
+.radar-overlay-br{position:absolute;bottom:20px;right:20px;z-index:10;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(200,151,42,0.4);pointer-events:none}
+
+.airports{padding:120px 80px;background:var(--black);border-top:1px solid rgba(200,151,42,0.07)}
+.sec-pre{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:12px}
+.sec-title{font-family:"Bebas Neue",sans-serif;font-size:clamp(56px,8vw,100px);line-height:.9;letter-spacing:-2px;color:#fff;margin-bottom:56px}
+.airport-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+.acard{background:#0d0d0d;border:1px solid rgba(200,151,42,0.07);padding:40px 36px;position:relative;overflow:hidden;transition:border-color .3s,transform .3s}
+.acard:hover{border-color:rgba(200,151,42,0.25);transform:translateY(-4px)}
+.acard::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0;transition:opacity .3s}
+.acard:hover::before{opacity:1}
+.acode{font-family:"Bebas Neue",sans-serif;font-size:72px;color:rgba(200,151,42,0.12);line-height:1;letter-spacing:-2px;position:absolute;right:24px;top:24px}
+.aname{font-family:"Bebas Neue",sans-serif;font-size:28px;color:var(--gold);letter-spacing:1px;margin-bottom:8px}
+.afull{font-size:12px;color:rgba(255,255,255,.25);letter-spacing:2px;text-transform:uppercase;margin-bottom:24px}
+.aroutes{list-style:none}
+.aroutes li{font-size:13px;color:rgba(255,255,255,.5);padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center}
+.aroutes li:last-child{border:none}
+.aroutes .dest{color:rgba(255,255,255,.8)}
+.aroutes .freq{font-size:10px;color:var(--gold);opacity:.6;letter-spacing:1px}
+.ahumor{margin-top:20px;font-size:11px;color:var(--gold);opacity:.5;font-style:italic}
+
+.models{padding:120px 80px;background:#0a0a0a;border-top:1px solid rgba(200,151,42,0.07)}
+.models-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:56px}
+.mcard{background:var(--black);border:1px solid rgba(255,255,255,0.05);padding:32px 28px;transition:border-color .3s,transform .3s;position:relative;overflow:hidden}
+.mcard:hover{border-color:rgba(200,151,42,0.2);transform:translateY(-3px)}
+.mtype{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.6;margin-bottom:8px}
+.mname{font-family:"Bebas Neue",sans-serif;font-size:38px;color:#fff;line-height:1;letter-spacing:-.5px;margin-bottom:4px}
+.mmake{font-size:11px;color:rgba(255,255,255,.25);letter-spacing:1px;margin-bottom:20px}
+.mstats{display:flex;flex-direction:column;gap:8px}
+.mstat{display:flex;justify-content:space-between;font-size:11px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.mstat:last-child{border:none}
+.mstat-label{color:rgba(255,255,255,.3)}
+.mstat-val{color:rgba(255,255,255,.75);font-weight:400}
+.mbadge{display:inline-block;margin-top:16px;padding:3px 10px;border-radius:4px;font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.mbadge.mil{background:rgba(200,151,42,0.1);color:rgba(200,151,42,0.8);border:1px solid rgba(200,151,42,0.15)}
+.mbadge.civ{background:rgba(50,180,100,0.08);color:rgba(50,180,100,0.7);border:1px solid rgba(50,180,100,0.12)}
+.mbadge.vip{background:rgba(100,150,255,0.08);color:rgba(100,150,255,0.7);border:1px solid rgba(100,150,255,0.12)}
+.mimg{width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:16px;filter:brightness(0.85) saturate(1.1)}
+
+.cinevid{position:relative;height:80vh;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.cinevid video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(0.28) saturate(1.3)}
+.cinevid-overlay{position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse 80% 70% at 50% 50%,transparent 20%,rgba(8,8,8,0.96) 100%),linear-gradient(to bottom,rgba(8,8,8,.5),transparent 30%,transparent 70%,rgba(8,8,8,.8))}
+.cinevid-txt{position:relative;z-index:5;text-align:center;padding:0 40px}
+.cinevid-pre{font-size:10px;letter-spacing:6px;text-transform:uppercase;color:rgba(200,151,42,0.5);margin-bottom:24px}
+.cinevid-big{font-family:"Bebas Neue",sans-serif;font-size:clamp(72px,14vw,200px);line-height:.88;letter-spacing:-4px;color:#fff}
+.cinevid-big span{color:var(--gold)}
+.cinevid-foot{font-size:13px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,.15);margin-top:32px}
+
+.stats{padding:120px 80px;background:var(--black);border-top:1px solid rgba(200,151,42,0.07)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:56px}
+.scard{padding:40px 32px;border-right:1px solid rgba(200,151,42,0.07);text-align:center}
+.scard:last-child{border:none}
+.snum{font-family:"Bebas Neue",sans-serif;font-size:clamp(56px,8vw,100px);line-height:1;letter-spacing:-3px;color:var(--gold)}
+.slabel{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:8px}
+.shumor{font-size:11px;color:rgba(255,255,255,.2);font-style:italic;margin-top:12px;line-height:1.6}
+
+footer{padding:56px 80px;border-top:1px solid rgba(200,151,42,0.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.fbrand{font-family:"Bebas Neue",sans-serif;font-size:18px;letter-spacing:6px;color:var(--gold)}
+.fnote{font-size:10px;color:rgba(255,255,255,.15);max-width:500px;text-align:right;line-height:1.8}
+
+.rv{opacity:0;transform:translateY(24px);transition:opacity .9s,transform .9s}
+.rv.on{opacity:1;transform:translateY(0)}
+.rv.d1{transition-delay:.1s}.rv.d2{transition-delay:.2s}.rv.d3{transition-delay:.3s}
+
+@media(max-width:900px){
+  nav{padding:0 20px}.nlinks{display:none}
+  .hero-content{padding:0 24px 80px}
+  .radar-hdr,.airports,.models,.stats{padding:80px 24px}
+  .airport-grid{grid-template-columns:1fr}
+  .models-grid{grid-template-columns:1fr 1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  footer{padding:40px 24px;flex-direction:column;text-align:center}.fnote{text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div style="position:fixed;bottom:28px;left:28px;z-index:600;display:flex;flex-direction:column;gap:10px">
+  <button onclick="if(!navigator.geolocation){alert('Geolocatie niet ondersteund');return;}navigator.geolocation.getCurrentPosition(function(p){window.toonLocatie(p.coords.latitude,p.coords.longitude,p.coords.accuracy);window.kaartMap.setView([p.coords.latitude,p.coords.longitude],12);},function(e){alert('Locatie kon niet worden bepaald. Geef toestemming in je browser.');console.warn('Geo fout:',e.message);},{enableHighAccuracy:true,timeout:10000})" style="background:#4285f4;color:#fff;border:none;padding:12px 20px;border-radius:40px;font-size:13px;letter-spacing:1px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;box-shadow:0 4px 16px rgba(66,133,244,0.5)">📍 Waar ben ik?</button>
+  <button id="leesbtn" style="background:var(--gold);color:#000;border:none;padding:14px 24px;border-radius:40px;font-size:13px;letter-spacing:2px;text-transform:uppercase;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;box-shadow:0 4px 24px rgba(200,151,42,0.4)">🔊 Lees alles voor</button>
+</div>
+<nav id="nav">
+  <a class="nbrand" href="#">België Vliegt</a>
+  <ul class="nlinks">
+    <li><a href="#radar">Live Radar</a></li>
+    <li><a href="#airports">Luchthavens</a></li>
+    <li><a href="#models">Toestellen</a></li>
+    <li><a href="#routes">NAVO Routes</a></li>
+    <li><a href="#stats">Cijfers</a></li>
+  </ul>
+</nav>
+
+<section class="hero" id="hero">
+  <img class="hero-video" src="f16-held.webp" alt="Belgische F-16 laag over een Vlaams dorp bij zonsondergang">
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-badge"><span class="bdot"></span>Live vluchten boven België</div>
+    <h1 class="hero-title">België<br><span>Vliegt</span></h1>
+    <p class="hero-sub">Van Zaventem tot Charleroi en Luik — alles wat boven ons hoofd passeert, van zware militaire transporten tot de budgetvlucht met te veel handbagage.</p>
+    <p class="hero-humor">Want ge moet er toch geraken met uw koffer friet en twee flessen Duvel.</p>
+  </div>
+</section>
+
+<section class="radarsec" id="radar">
+  <div class="radar-hdr rv">
+    <div class="radar-pre">Realtime ADS-B data</div>
+    <h2 class="radar-title">Alles wat<br>nu vliegt.</h2>
+    <p class="radar-sub">Live vluchtradar boven België. Klik op een vliegtuig voor vluchtinfo, bestemming en toesteltype. Inclusief de militaire vluchten die ze ons laten zien.</p>
+  </div>
+  <div class="radar-wrap" id="radar-wrap" style="height:620px">
+    <div id="kaart" style="width:100%;height:100%"></div>
+    <div class="radar-overlay-br">Kaart: OpenStreetMap · Live data: OpenSky Network · ververst elke 30s</div>
+    <div style="position:absolute;top:16px;right:16px;z-index:500;background:rgba(8,8,8,0.85);border:1px solid rgba(200,151,42,0.3);padding:8px 16px;border-radius:6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold)" id="vluchtteller">vluchten laden...</div>
+  </div>
+</section>
+
+<section class="airports" id="airports">
+  <div class="rv"><div class="sec-pre">De drie grote</div>
+  <h2 class="sec-title">Belgische<br>Luchthavens.</h2></div>
+  <div class="airport-grid">
+    <div class="acard rv">
+      <div class="acode">BRU</div>
+      <div class="aname">Brussels Airport</div>
+      <div class="afull">Brussel-Nationaal — Zaventem</div>
+      <ul class="aroutes">
+        <li><span class="dest">✈ London Heathrow</span><span class="freq">28×/dag</span></li>
+        <li><span class="dest">✈ Amsterdam</span><span class="freq">22×/dag</span></li>
+        <li><span class="dest">✈ Paris CDG</span><span class="freq">18×/dag</span></li>
+        <li><span class="dest">✈ Frankfurt</span><span class="freq">15×/dag</span></li>
+        <li><span class="dest">✈ Dubai</span><span class="freq">2×/dag</span></li>
+        <li><span class="dest">✈ New York JFK</span><span class="freq">1×/dag</span></li>
+      </ul>
+      <div class="ahumor">26 miljoen passagiers per jaar. Allemaal in de opstopping op de E40 richting luchthaven.</div>
+    </div>
+    <div class="acard rv d1">
+      <div class="acode">CRL</div>
+      <div class="aname">Charleroi Airport</div>
+      <div class="afull">Brussels South Charleroi</div>
+      <ul class="aroutes">
+        <li><span class="dest">✈ Málaga</span><span class="freq">14×/week</span></li>
+        <li><span class="dest">✈ Barcelona</span><span class="freq">12×/week</span></li>
+        <li><span class="dest">✈ Faro</span><span class="freq">10×/week</span></li>
+        <li><span class="dest">✈ Rome</span><span class="freq">8×/week</span></li>
+        <li><span class="dest">✈ Marrakech</span><span class="freq">6×/week</span></li>
+        <li><span class="dest">✈ Lanzarote</span><span class="freq">4×/week</span></li>
+      </ul>
+      <div class="ahumor">De luchthaven van het volk. Ryanair, een te zware koffer en opstaan om 3u want ge woont toch in Gent.</div>
+    </div>
+    <div class="acard rv d2">
+      <div class="acode">LGG</div>
+      <div class="aname">Liège Airport</div>
+      <div class="afull">Luik — Bierset</div>
+      <ul class="aroutes">
+        <li><span class="dest">✈ Shanghai (cargo)</span><span class="freq">5×/week</span></li>
+        <li><span class="dest">✈ Hong Kong (cargo)</span><span class="freq">4×/week</span></li>
+        <li><span class="dest">✈ Dubai (cargo)</span><span class="freq">6×/week</span></li>
+        <li><span class="dest">✈ Casablanca</span><span class="freq">7×/week</span></li>
+        <li><span class="dest">✈ Agadir</span><span class="freq">5×/week</span></li>
+        <li><span class="dest">✈ Militaire vluchten</span><span class="freq">dagelijks</span></li>
+      </ul>
+      <div class="ahumor">Weinig passagiers, veel pakjes. 's Nachts het drukste van België. Uw Bol.com bestelling groet u.</div>
+    </div>
+    <div class="acard rv d3">
+      <div class="acode">OST</div>
+      <div class="aname">Oostende-Brugge</div>
+      <div class="afull">Oostende International Airport</div>
+      <ul class="aroutes">
+        <li><span class="dest">✈ Charter — Spanje</span><span class="freq">seizoen</span></li>
+        <li><span class="dest">✈ Cargo — DHL / TNT</span><span class="freq">dagelijks</span></li>
+        <li><span class="dest">✈ Privévluchten</span><span class="freq">dagelijks</span></li>
+        <li><span class="dest">✈ Militaire doorvoer</span><span class="freq">occasioneel</span></li>
+        <li><span class="dest">✈ Luchtreddingsdienst</span><span class="freq">24u/24</span></li>
+      </ul>
+      <div class="ahumor">Klein maar fijn. Ge parkeert uw auto voor de deur en vijf minuten later zit ge op het vliegtuig. Zaventem kan daar iets van leren.</div>
+    </div>
+  </div>
+</section>
+
+<section class="cinevid">
+  <video autoplay muted loop playsinline>
+    <source src="https://videos.pexels.com/video-files/18824883/18824883-uhd_1440_2560_60fps.mp4" type="video/mp4">
+  </video>
+  <div class="cinevid-overlay"></div>
+  <div class="cinevid-txt rv">
+    <div class="cinevid-pre">35.000 voet boven de Kempen</div>
+    <div class="cinevid-big">Boven<br><span>België</span><br>vandaag.</div>
+    <div class="cinevid-foot">Van Oostende tot Aarlen — ze vliegen er allemaal over</div>
+  </div>
+</section>
+
+<section class="models" id="models">
+  <div class="rv"><div class="sec-pre">Wat er allemaal zweeft</div>
+  <h2 class="sec-title">De<br>Toestellen.</h2></div>
+  <div class="models-grid">
+    <div class="mcard rv">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/7/79/The_Airbus_A400M_Atlas_%2820215372111%29.jpg" alt="A400M" onerror="this.style.display='none'">
+      <div class="mtype">Militair — Transport</div>
+      <div class="mname">A400M Atlas</div>
+      <div class="mmake">Airbus Defence & Space</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">8.900 km</span></div>
+        <div class="mstat"><span class="mstat-label">Max lading</span><span class="mstat-val">37.000 kg</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">780 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">4× TP400-D6</span></div>
+        <div class="mstat"><span class="mstat-label">België heeft</span><span class="mstat-val">7 toestellen</span></div>
+        <div class="mstat"><span class="mstat-label">Bemanning</span><span class="mstat-val">4–6 personen</span></div>
+      </div>
+      <div class="bcs" style="margin-top:12px;font-size:11px;color:rgba(255,255,255,.3);line-height:1.7">2 piloten · 1 flight engineer · 1–2 loadmasters · optioneel 1 medic. Kan tot 116 paracommando's of 66 brancard­patiënten vervoeren.</div>
+      <span class="mbadge mil">Belgische Luchtmacht</span>
+    </div>
+    <div class="mcard rv d1">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/IndiGo_Airbus_A320neo_F-WWDG_%28to_VT-ITI%29_%2828915135713%29.jpg/330px-IndiGo_Airbus_A320neo_F-WWDG_%28to_VT-ITI%29_%2828915135713%29.jpg" alt="A320neo" onerror="this.style.display='none'">
+      <div class="mtype">Civiel — Medium Haul</div>
+      <div class="mname">A320neo</div>
+      <div class="mmake">Airbus</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">6.300 km</span></div>
+        <div class="mstat"><span class="mstat-label">Passagiers</span><span class="mstat-val">165–194</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">833 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">2× CFM LEAP</span></div>
+        <div class="mstat"><span class="mstat-label">Operator</span><span class="mstat-val">Brussels Airlines</span></div>
+      </div>
+      <span class="mbadge civ">Meest gevlogen op BRU</span>
+    </div>
+    <div class="mcard rv d2">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Turkish_Airlines%2C_Airbus_A330-300_TC-JNL_NRT_%2823708073592%29.jpg/330px-Turkish_Airlines%2C_Airbus_A330-300_TC-JNL_NRT_%2823708073592%29.jpg" alt="A330" onerror="this.style.display='none'">
+      <div class="mtype">Civiel — Long Haul</div>
+      <div class="mname">A330-300</div>
+      <div class="mmake">Airbus</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">11.750 km</span></div>
+        <div class="mstat"><span class="mstat-label">Passagiers</span><span class="mstat-val">277–440</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">871 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">2× Trent 772</span></div>
+        <div class="mstat"><span class="mstat-label">Route</span><span class="mstat-val">BRU–New York</span></div>
+      </div>
+      <span class="mbadge civ">Brussels Airlines vloot</span>
+    </div>
+    <div class="mcard rv d3">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Delta_Boeing_737-800_N371DA_departing_Boston_June_2025.jpg/330px-Delta_Boeing_737-800_N371DA_departing_Boston_June_2025.jpg" alt="B737" onerror="this.style.display='none'">
+      <div class="mtype">Civiel — Short Haul</div>
+      <div class="mname">B737-800</div>
+      <div class="mmake">Boeing</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">5.765 km</span></div>
+        <div class="mstat"><span class="mstat-label">Passagiers</span><span class="mstat-val">162–189</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">842 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">2× CFM56-7B</span></div>
+        <div class="mstat"><span class="mstat-label">Operator</span><span class="mstat-val">Ryanair / TUI</span></div>
+      </div>
+      <span class="mbadge civ">Populair op CRL</span>
+    </div>
+    <div class="mcard rv">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/f/ff/General_Dynamics_F-16_Fighting_Falcon_2.JPG" alt="F-16" onerror="this.style.display='none'">
+      <div class="mtype">Militair — Gevecht</div>
+      <div class="mname">F-16 AM/BM</div>
+      <div class="mmake">General Dynamics / Lockheed</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Max snelheid</span><span class="mstat-val">Mach 2.05</span></div>
+        <div class="mstat"><span class="mstat-label">Plafond</span><span class="mstat-val">15.240 m</span></div>
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">4.220 km</span></div>
+        <div class="mstat"><span class="mstat-label">Motor</span><span class="mstat-val">1× F100-PW-220</span></div>
+        <div class="mstat"><span class="mstat-label">Basis</span><span class="mstat-val">Kleine Brogel / Florennes</span></div>
+      </div>
+      <div class="bcs" style="margin-top:12px;font-size:11px;color:rgba(255,255,255,.3);line-height:1.7">1 piloot · eenzitter. De tweeplaatsige F-16B heeft 2 zitplaatsen voor opleiding. Vliegt solo — geen cabinepersoneel of laders.</div>
+      <span class="mbadge mil">Wordt vervangen door F-35A</span>
+    </div>
+    <div class="mcard rv d1">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/F-35A_flight_%28cropped%29.jpg/330px-F-35A_flight_%28cropped%29.jpg" alt="F-35A" onerror="this.style.display='none'">
+      <div class="mtype">Militair — Gevecht</div>
+      <div class="mname">F-35A</div>
+      <div class="mmake">Lockheed Martin</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Max snelheid</span><span class="mstat-val">Mach 1.6</span></div>
+        <div class="mstat"><span class="mstat-label">Plafond</span><span class="mstat-val">15.240 m</span></div>
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">2.800 km</span></div>
+        <div class="mstat"><span class="mstat-label">Motor</span><span class="mstat-val">1× F135-PW-100</span></div>
+        <div class="mstat"><span class="mstat-label">Besteld</span><span class="mstat-val">34 toestellen</span></div>
+      </div>
+      <div class="bcs" style="margin-top:12px;font-size:11px;color:rgba(255,255,255,.3);line-height:1.7">1 piloot · eenzitter. Volledig geautomatiseerd — geen boordschutter of navigator. Stealth design, transponder kan uit.</div>
+      <span class="mbadge mil">Opvolger F-16</span>
+    </div>
+    <div class="mcard rv d2">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Airbus_Industrie_A321neo_D-AVXA_%2829428329122%29.jpg/250px-Airbus_Industrie_A321neo_D-AVXA_%2829428329122%29.jpg" alt="A321neo" onerror="this.style.display='none'">
+      <div class="mtype">Militair — VVIP</div>
+      <div class="mname">A321neo</div>
+      <div class="mmake">Airbus — Belgische Staat</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">7.400 km</span></div>
+        <div class="mstat"><span class="mstat-label">Configuratie</span><span class="mstat-val">VIP / Business</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">833 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Basis</span><span class="mstat-val">Melsbroek</span></div>
+        <div class="mstat"><span class="mstat-label">Gebruikers</span><span class="mstat-val">Koningshuis / Regering</span></div>
+      </div>
+      <div class="bcs" style="margin-top:12px;font-size:11px;color:rgba(255,255,255,.3);line-height:1.7">2 piloten · 1 flight engineer · 2–4 cabinebegeleiders · beveiligingspersoneel. VIP-configuratie met slaapkamer, vergaderzaal en beveiligde communicatie.</div>
+      <span class="mbadge vip">Koninklijke vluchten</span>
+    </div>
+    <div class="mcard rv d3">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/A6-ECF_B777-300_Emirates_front_%284134226438%29.jpg/250px-A6-ECF_B777-300_Emirates_front_%284134226438%29.jpg" alt="B777" onerror="this.style.display='none'">
+      <div class="mtype">Civiel — Ultra Long Haul</div>
+      <div class="mname">B777-300ER</div>
+      <div class="mmake">Boeing</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">13.650 km</span></div>
+        <div class="mstat"><span class="mstat-label">Passagiers</span><span class="mstat-val">368–550</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">905 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">2× GE90-115B</span></div>
+        <div class="mstat"><span class="mstat-label">Operator</span><span class="mstat-val">Emirates op BRU</span></div>
+      </div>
+      <span class="mbadge civ">Grootste toestel op BRU</span>
+    </div>
+    <div class="mcard rv">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Boeing_747-4R7F%28SCD%29%2C_Cargolux_Airlines_International_JP7244942.jpg/250px-Boeing_747-4R7F%28SCD%29%2C_Cargolux_Airlines_International_JP7244942.jpg" alt="B747F" onerror="this.style.display='none'">
+      <div class="mtype">Cargo</div>
+      <div class="mname">B747-400F</div>
+      <div class="mmake">Boeing</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Max lading</span><span class="mstat-val">113.000 kg</span></div>
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">8.130 km</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">910 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">4× CF6-80C2</span></div>
+        <div class="mstat"><span class="mstat-label">Basis</span><span class="mstat-val">Liège Airport</span></div>
+      </div>
+      <span class="mbadge civ">Nachtcargo op LGG</span>
+    </div>
+    <div class="mcard rv d1">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Dassault_Falcon_7X_N73KT_FDK_MD3.jpg/320px-Dassault_Falcon_7X_N73KT_FDK_MD3.jpg" alt="Falcon 7X" onerror="this.style.display='none'">
+      <div class="mtype">Business Aviation</div>
+      <div class="mname">Falcon 7X</div>
+      <div class="mmake">Dassault Aviation</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">11.019 km</span></div>
+        <div class="mstat"><span class="mstat-label">Passagiers</span><span class="mstat-val">12–16</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">Mach 0.9</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">3× PW307A</span></div>
+        <div class="mstat"><span class="mstat-label">Basis</span><span class="mstat-val">EBAW Antwerpen</span></div>
+      </div>
+      <span class="mbadge vip">Business Aviation</span>
+    </div>
+    <div class="mcard rv d2">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Embraer_E195-E2_%28ERJ_190-400_STD%29_PS-AEF.jpg/250px-Embraer_E195-E2_%28ERJ_190-400_STD%29_PS-AEF.jpg" alt="E195-E2" onerror="this.style.display='none'">
+      <div class="mtype">Civiel — Regionaal</div>
+      <div class="mname">E195-E2</div>
+      <div class="mmake">Embraer</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">4.800 km</span></div>
+        <div class="mstat"><span class="mstat-label">Passagiers</span><span class="mstat-val">120–146</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">870 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Motoren</span><span class="mstat-val">2× PW1900G</span></div>
+        <div class="mstat"><span class="mstat-label">Operator</span><span class="mstat-val">Brussels Airlines</span></div>
+      </div>
+      <span class="mbadge civ">Regionale routes</span>
+    </div>
+    <div class="mcard rv d3">
+      <img class="mimg" src="https://upload.wikimedia.org/wikipedia/commons/5/56/Airbus_A330_MRTT_RAF_ZZ330.jpg" alt="A330 MRTT" onerror="this.style.display='none'">
+      <div class="mtype">Militair — Tanker</div>
+      <div class="mname">A330 MRTT</div>
+      <div class="mmake">Airbus Defence & Space</div>
+      <div class="mstats">
+        <div class="mstat"><span class="mstat-label">Max brandstof</span><span class="mstat-val">111.000 kg</span></div>
+        <div class="mstat"><span class="mstat-label">Bereik</span><span class="mstat-val">14.800 km</span></div>
+        <div class="mstat"><span class="mstat-label">Snelheid</span><span class="mstat-val">880 km/u</span></div>
+        <div class="mstat"><span class="mstat-label">Basis</span><span class="mstat-val">Eindhoven (NAVO)</span></div>
+        <div class="mstat"><span class="mstat-label">Gebruik</span><span class="mstat-val">Bijtanken in de lucht</span></div>
+      </div>
+      <div class="bcs" style="margin-top:12px;font-size:11px;color:rgba(255,255,255,.3);line-height:1.7">2 piloten · 1 vluchtingenieur · 2–3 tankeroperatoren · optioneel medisch team. Kan tegelijk 2 vliegtuigen bijtanken via de boom en hose systemen.</div>
+      <span class="mbadge mil">NAVO — gedeeld met België</span>
+    </div>
+  </div>
+</section>
+
+<section class="airports" id="routes">
+  <div class="rv"><div class="sec-pre">Waarom altijd dezelfde baan?</div>
+  <h2 class="sec-title">Vaste Navo-<br>Routes.</h2></div>
+  <div class="airport-grid">
+    <div class="acard rv">
+      <div class="acode">BE</div>
+      <div class="aname">Melsbroek — Eindhoven</div>
+      <div class="afull">Dagelijkse pendel — Belgische Luchtmacht / NAVO</div>
+      <ul class="aroutes">
+        <li><span class="dest">Toestel</span><span class="freq">C-130 / A400M</span></li>
+        <li><span class="dest">Hoogte</span><span class="freq">FL180–FL240</span></li>
+        <li><span class="dest">Duur</span><span class="freq">~25 min</span></li>
+        <li><span class="dest">Richting</span><span class="freq">Noord — over Antwerpen</span></li>
+      </ul>
+      <div class="ahumor">Vaste pendel tussen de twee grootste NAVO-luchttransportbasissen van de Benelux.</div>
+    </div>
+    <div class="acard rv d1">
+      <div class="acode">DE</div>
+      <div class="aname">Melsbroek — Ramstein</div>
+      <div class="afull">NAVO-logistiek — België naar Duitsland</div>
+      <ul class="aroutes">
+        <li><span class="dest">Toestel</span><span class="freq">A400M / C-130</span></li>
+        <li><span class="dest">Hoogte</span><span class="freq">FL200–FL280</span></li>
+        <li><span class="dest">Duur</span><span class="freq">~45 min</span></li>
+        <li><span class="dest">Richting</span><span class="freq">Oost — over Luik</span></li>
+      </ul>
+      <div class="ahumor">Ramstein is het grootste Amerikaanse luchtmachtbasis buiten de VS. Veel verkeer, vaste route.</div>
+    </div>
+    <div class="acard rv d2" style="border-color:rgba(200,151,42,0.2)">
+      <div class="acode" style="color:rgba(200,151,42,0.2)">KB</div>
+      <div class="aname" style="color:var(--gold)">Kleine Brogel</div>
+      <div class="afull">10e Wing — Belgische Luchtmacht · Peer, Limburg</div>
+      <ul class="aroutes">
+        <li><span class="dest">Toestellen</span><span class="freq">F-16 AM/BM → F-35A</span></li>
+        <li><span class="dest">Nucleaire taak</span><span class="freq">NAVO B61-bomben</span></li>
+        <li><span class="dest">Oefenroutes</span><span class="freq">Noordzee / Duitsland</span></li>
+        <li><span class="dest">QRA — Scramble</span><span class="freq">24u/24 — 7/7</span></li>
+        <li><span class="dest">Naburige basis</span><span class="freq">Florennes (2e Wing)</span></li>
+      </ul>
+      <div class="ahumor">Eén van de weinige NAVO-basissen met nucleaire wapens. En gewoon in Limburg, tussen de fruitbomen. Alles normaal hier.</div>
+    </div>
+    <div class="acard rv">
+      <div class="acode">LU</div>
+      <div class="aname">Overgang Luxemburg — Duitsland</div>
+      <div class="afull">NAVO-corridor door Belgisch luchtruim</div>
+      <ul class="aroutes">
+        <li><span class="dest">Toestel</span><span class="freq">Allerlei NAVO-types</span></li>
+        <li><span class="dest">Hoogte</span><span class="freq">FL250–FL380</span></li>
+        <li><span class="dest">Richting</span><span class="freq">Oost-West doorvlucht</span></li>
+        <li><span class="dest">Frequentie</span><span class="freq">Dagelijks meerdere</span></li>
+      </ul>
+      <div class="ahumor">België is de kruising van Europa. Alles wat van oost naar west of noord naar zuid vliegt, passeert hier.</div>
+    </div>
+    <div class="acard rv d1">
+      <div class="acode">IT</div>
+      <div class="aname">Melsbroek — Aviano / Sigonella</div>
+      <div class="afull">NAVO-missies richting Middellandse Zee</div>
+      <ul class="aroutes">
+        <li><span class="dest">Toestel</span><span class="freq">A400M / KC-135</span></li>
+        <li><span class="dest">Hoogte</span><span class="freq">FL280–FL360</span></li>
+        <li><span class="dest">Duur</span><span class="freq">~2u</span></li>
+        <li><span class="dest">Richting</span><span class="freq">Zuid — over Frankrijk</span></li>
+      </ul>
+      <div class="ahumor">Logistieke routes naar Italiaanse NAVO-basissen. Meer dan ge denkt.</div>
+    </div>
+    <div class="acard rv d2">
+      <div class="acode">?</div>
+      <div class="aname">Zonder transponder</div>
+      <div class="afull">Wat ge NIET ziet op de radar</div>
+      <ul class="aroutes">
+        <li><span class="dest">F-35 oefeningen</span><span class="freq">Transponder uit</span></li>
+        <li><span class="dest">Speciale operaties</span><span class="freq">Niet zichtbaar</span></li>
+        <li><span class="dest">Drones</span><span class="freq">Soms zichtbaar</span></li>
+        <li><span class="dest">AWACS patrouilles</span><span class="freq">Gedeeltelijk</span></li>
+      </ul>
+      <div class="ahumor">Niet alles wat vliegt is te zien. Wat ge wel ziet is al indrukwekkend genoeg.</div>
+    </div>
+  </div>
+</section>
+
+<section class="stats" id="stats">
+  <div class="rv"><div class="sec-pre">Cijfers die je wakker houden</div>
+  <h2 class="sec-title">België in<br>de Lucht.</h2></div>
+  <div class="stats-grid">
+    <div class="scard rv">
+      <div class="snum">780</div>
+      <div class="slabel">Vluchten per dag op BRU</div>
+      <div class="shumor">Meer starts per dag dan federale regeringen die we gevormd hebben in tien jaar.</div>
+    </div>
+    <div class="scard rv d1">
+      <div class="snum">34</div>
+      <div class="slabel">F-35A jets besteld</div>
+      <div class="shumor">Elk toestel kost meer dan de Brusselse Ring en maakt ook evenveel herrie.</div>
+    </div>
+    <div class="scard rv d2">
+      <div class="snum">3</div>
+      <div class="slabel">Internationale luchthavens</div>
+      <div class="shumor">Drie luchthavens voor een land waar ge in twee uur van zee tot Ardennen rijdt. Als er geen file staat.</div>
+    </div>
+    <div class="scard rv d3">
+      <div class="snum">26M</div>
+      <div class="slabel">Passagiers per jaar op BRU</div>
+      <div class="shumor">Allemaal op weg naar de zon. Want ge hebt ze hier van oktober tot april toch niet gezien.</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="fbrand">België Vliegt</div>
+  <div class="fnote">Vluchtradar via FlightRadar24. Vliegtuigdata gebaseerd op publieke bronnen. Militaire data is openbare informatie. Humor is gratis maar ook niet altijd even accuraat.</div>
+</footer>
+
+<script>
+window.addEventListener('scroll',function(){
+  document.getElementById('nav').classList.toggle('dark',window.scrollY>50);
+});
+var ro=new IntersectionObserver(function(e){
+  e.forEach(function(x){if(x.isIntersecting)x.target.classList.add('on')});
+},{threshold:0.07});
+document.querySelectorAll('.rv').forEach(function(el){ro.observe(el)});
+
+// Volledige tekst per sectie
+function getAllText(){
+  return [
+    'België vliegt. Van Zaventem tot Charleroi en Luik — alles wat boven ons hoofd passeert, van zware militaire transporten tot de budgetvlucht met te veel handbagage. Want ge moet er toch geraken met uw koffer friet en twee flessen Duvel.',
+    'Live vluchtradar. Hier kunt u alles volgen wat nu boven België vliegt. Typ flightradar24 punt com in uw browser voor alle civiele vluchten. Voor militaire vluchten zoals de A400M en de F-16 typt u globe punt adsbexchange punt com.',
+    'Brussels Airport, ook gekend als Zaventem, heeft 26 miljoen passagiers per jaar en 780 vluchten per dag. Allemaal in de opstopping op de E40 richting luchthaven. De populairste routes zijn Londen, Amsterdam, Parijs en Frankfurt.',
+    'Brussels South Charleroi is de luchthaven van het volk. Ryanair, een te zware koffer, en opstaan om 3 uur want ge woont toch in Gent. Populaire bestemmingen zijn Malaga, Barcelona, Faro en Rome.',
+    'Luik Airport of Bierset is vooral een cargohaven. Weinig passagiers, veel pakjes. Des nachts het drukste van België. Uw Bol.com bestelling groet u.',
+    'De toestellen boven België. Eerst de militaire. De Airbus A400M Atlas is het werkpaard van de Belgische luchtmacht. 7 toestellen in gebruik, bereik van 8900 kilometer, maximale lading van 37000 kilogram.',
+    'De F-16 Fighting Falcon, gebouwd door General Dynamics, vliegt vanuit Kleine Brogel en Florennes. Maximumsnelheid Mach 2 komma 05. Wordt vervangen door de F-35A.',
+    'De F-35A van Lockheed Martin. België heeft 34 toestellen besteld. Elk toestel kost meer dan de Brusselse Ring en maakt ook evenveel herrie.',
+    'De Airbus A320neo vliegt het meest boven België, geopereerd door Brussels Airlines. Bereik van 6300 kilometer, tot 194 passagiers.',
+    'De Boeing 737-800 is populair op Charleroi, geopereerd door Ryanair en TUI. 162 tot 189 passagiers, bereik van 5765 kilometer.',
+    'De Airbus A330-300 vliegt de lange afstandsroutes van Brussels Airlines, zoals Brussel naar New York. Tot 440 passagiers, bereik van 11750 kilometer.',
+    'De Boeing 777-300ER van Emirates is het grootste toestel op Brussels Airport. Tot 550 passagiers, bereik van 13650 kilometer.',
+    'De vaste NAVO-routes boven België. België ligt midden in het NAVO-netwerk. Vaste pendels lopen van Melsbroek naar Eindhoven, naar Ramstein in Duitsland, en naar Italiaanse basissen. De F-16 vliegt oefenroutes boven de Noordzee.',
+    'Militaire vluchten volgen vaste corridors afgesproken met Eurocontrol. Wat ge niet ziet: F-35 oefeningen met transponder uit, speciale operaties, en AWACS-patrouilles.',
+    'Tot slot de cijfers. 780 vluchten per dag op Brussel. Meer starts dan federale regeringen in tien jaar. 34 F-35 jets besteld. 3 internationale luchthavens. En 26 miljoen passagiers per jaar, allemaal op weg naar de zon. Want ge hebt ze hier van oktober tot april toch niet gezien.'
+  ].join(' ... ');
+}
+
+// Scroll-gebaseerd voorlezen (per sectie)
+var spoken={};
+var secs=[
+  {id:'hero',text:'België vliegt. Van Zaventem tot Charleroi en Luik — alles wat boven ons hoofd passeert, van zware militaire transporten tot de budgetvlucht met te veel handbagage.'},
+  {id:'radar',text:'Live vluchtradar. Typ flightradar24 punt com voor civiele vluchten, of globe punt adsbexchange punt com voor militaire vluchten zoals de A400M en F-16 boven Kleine Brogel.'},
+  {id:'airports',text:'De drie Belgische luchthavens. Brussels Airport in Zaventem met 26 miljoen passagiers per jaar en vluchten naar Londen, Amsterdam, Parijs, Frankfurt, Dubai en New York. Charleroi in het zuiden, luchthaven van het volk, met routes naar Malaga, Barcelona en Faro. En Luik als cargohaven, des nachts het drukste van België.'},
+  {id:'routes',text:'De vaste NAVO-routes boven België. Melsbroek naar Eindhoven dagelijks met de C-130 of A400M. Melsbroek naar Ramstein in Duitsland over Luik. F-16 oefenvluchten boven de Noordzee. En wat ge niet ziet: F-35 oefeningen met transponder uit en speciale operaties.'},
+  {id:'models',text:'De toestellen. De A400M Atlas van de Belgische luchtmacht met 37000 kilogram laadvermogen. De F-16 vanuit Kleine Brogel en Florennes, maximumsnelheid Mach 2. De F-35A, 34 besteld door België. De A320neo van Brussels Airlines, de B737 van Ryanair op Charleroi, de A330 naar New York, de Boeing 777 van Emirates als grootste toestel op Brussel, en de B747 vrachtvliegtuigen des nachts op Luik.'},
+  {id:'stats',text:'780 vluchten per dag op Brussels Airport. Meer starts dan federale regeringen in tien jaar. 34 F-35 jets besteld, elk duurder dan de Brusselse Ring. Drie internationale luchthavens voor een land waar ge in twee uur van zee tot de Ardennen rijdt, als er geen file staat. En 26 miljoen passagiers per jaar, allemaal op weg naar de zon.'}
+];
+var sro=new IntersectionObserver(function(e){
+  e.forEach(function(x){
+    if(x.isIntersecting&&!spoken[x.target.id]){
+      spoken[x.target.id]=true;
+      var s=secs.find(function(s){return s.id===x.target.id});
+      if(!s)return;
+      var u=new SpeechSynthesisUtterance(s.text);
+      u.lang='nl-NL';u.rate=0.88;u.pitch=1;u.volume=0.85;
+      speechSynthesis.speak(u);
+    }
+  });
+},{threshold:0.35});
+secs.forEach(function(s){
+  var el=document.getElementById(s.id);
+  if(el)sro.observe(el);
+});
+
+// Alles voorlezen knop — in stukken om hakkelen te vermijden
+function leesAlles(){
+  speechSynthesis.cancel();
+  var zinnen=getAllText().split(' ... ');
+  var i=0;
+  document.getElementById('leesbtn').textContent='⏹ Stop';
+  function volgend(){
+    if(!lezing||i>=zinnen.length){
+      document.getElementById('leesbtn').textContent='🔊 Lees alles voor';
+      lezing=false;return;
+    }
+    var u=new SpeechSynthesisUtterance(zinnen[i++]);
+    u.lang='nl-NL';u.rate=0.88;u.pitch=1;u.volume=0.9;
+    u.onend=volgend;
+    speechSynthesis.speak(u);
+  }
+  volgend();
+}
+function stopLezen(){
+  speechSynthesis.cancel();
+  document.getElementById('leesbtn').textContent='🔊 Lees alles voor';
+}
+// Leaflet kaart
+(function(){
+  var map=L.map('kaart',{zoomControl:true,scrollWheelZoom:true}).setView([50.6,4.5],8);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:19
+  }).addTo(map);
+
+  function goudIcon(lbl,kleur){
+    kleur=kleur||'#C8972A';
+    return L.divIcon({className:'',iconAnchor:[12,12],popupAnchor:[0,-14],html:
+      '<div style="width:24px;height:24px;border-radius:50%;background:'+kleur+';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#000;font-family:sans-serif">'+lbl+'</div>'
+    });
+  }
+
+  var locaties=[
+    {pos:[50.9014,4.4844],naam:'Brussels Airport (BRU)',sub:'Zaventem · 26M passagiers/jaar',ic:'BRU',kleur:'#C8972A',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/2/twenties/Brussels_Airport_aerial.jpg/320px-Brussels_Airport_aerial.jpg',
+     foto2:'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Brussels_Airport_-_Terminal_building_%282%29.jpg/320px-Brussels_Airport_-_Terminal_building_%282%29.jpg'},
+    {pos:[50.4592,4.4528],naam:'Charleroi Airport (CRL)',sub:'Brussels South · Ryanair basis · 8M pax',ic:'CRL',kleur:'#C8972A',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Brussels_South_Charleroi_Airport.jpg/320px-Brussels_South_Charleroi_Airport.jpg'},
+    {pos:[50.6374,5.4433],naam:'Liège Airport (LGG)',sub:'Bierset · Cargohaven · des nachts het drukste',ic:'LGG',kleur:'#C8972A',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Liege_Airport_aerial.jpg/320px-Liege_Airport_aerial.jpg'},
+    {pos:[51.1989,2.8622],naam:'Oostende-Brugge (OST)',sub:'Charter · Cargo · Privévluchten · Luchtreddingsdienst',ic:'OST',kleur:'#C8972A',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Ostend-Bruges_International_Airport_-_Terminal.jpg/320px-Ostend-Bruges_International_Airport_-_Terminal.jpg'},
+    {pos:[51.1681,5.4700],naam:'Kleine Brogel — 10e Wing',sub:'F-16 → F-35A · Nucleaire taak NAVO · QRA 24/7',ic:'KB',kleur:'#e63946',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/f/ff/General_Dynamics_F-16_Fighting_Falcon_2.JPG'},
+    {pos:[50.2667,5.1167],naam:'Florennes — 2e Wing',sub:'F-16 · Gevechtsoperaties · oefengebied Ardennen',ic:'FL',kleur:'#e63946',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/F-35A_flight_%28cropped%29.jpg/330px-F-35A_flight_%28cropped%29.jpg'},
+    {pos:[50.9333,4.4667],naam:'Melsbroek — 15e Wing',sub:'A400M · C-130 · VVIP koninklijke vluchten',ic:'ME',kleur:'#e63946',
+     foto:'https://upload.wikimedia.org/wikipedia/commons/7/79/The_Airbus_A400M_Atlas_%2820215372111%29.jpg'},
+  ];
+
+  locaties.forEach(function(l){
+    var popHtml='<div style="width:220px;font-family:sans-serif">'
+      +(l.foto?'<img src="'+l.foto+'" style="width:100%;height:110px;object-fit:cover;border-radius:4px;margin-bottom:8px" onerror="this.style.display=\'none\'">':'')
+      +'<b style="color:#C8972A;font-size:13px">'+l.naam+'</b>'
+      +'<div style="font-size:11px;color:#aaa;margin-top:4px;line-height:1.5">'+l.sub+'</div>'
+      +'</div>';
+    L.marker(l.pos,{icon:goudIcon(l.ic,l.kleur)}).addTo(map).bindPopup(popHtml,{maxWidth:240});
+  });
+
+  // Live vluchten via OpenSky Network
+  var vliegCluster={
+    addLayer:function(m){m.addTo(map)},
+    removeLayer:function(m){map.removeLayer(m)}
+  };
+  var vliegMarkers={};
+  function laadVluchten(){
+    fetch('https://api.airplanes.live/v2/point/50.5/4.5/250')
+      .then(function(r){return r.json()})
+      .then(function(data){
+        if(!data.ac)return;
+        var gezien={};
+        data.ac.forEach(function(s){
+          var call=(s.flight||s.r||'?').trim();
+          var lat=s.lat,lon=s.lon,hdg=s.track||0;
+          var alt=s.alt_baro?Math.round(s.alt_baro*0.3048)+'m':'?';
+          var spd=s.gs?Math.round(s.gs*1.852)+'km/u':'?';
+          var squawk=s.squawk||'';
+          if(!lat||!lon)return;
+
+          // Type bepalen
+          var type='civiel',kleur='#C8972A',glow='rgba(200,151,42,0.7)',label='',emoji='✈';
+          if(/^BAF/i.test(call)){type='Belgische Luchtmacht';kleur='#e63946';glow='rgba(230,57,70,0.9)';label='🪖 MILITAIR';emoji='✈'}
+          else if(/^(NATO|NАТО|MMF|MRTT)/i.test(call)){type='NAVO';kleur='#e63946';glow='rgba(230,57,70,0.9)';label='🛡 NAVO';emoji='✈'}
+          else if(/^(BEL|BELF|BELN|BELVIP|BELMED)/i.test(call)){type='Belgische overheid';kleur='#4cc9f0';glow='rgba(76,201,240,0.8)';label='👑 VIP';emoji='✈'}
+          else if(/^(BEW|BEAW)/i.test(call)){type='Antwerpse luchtvaart';kleur='#C8972A';glow='rgba(200,151,42,0.7)';emoji='✈'}
+          else if(squawk==='7700'){type='🚨 NOODGEVAL';kleur='#ff006e';glow='rgba(255,0,110,1)';label='🚨 NOOD 7700';emoji='🚨'}
+          else if(squawk==='7600'){type='📡 Radiostilte';kleur='#fb5607';glow='rgba(251,86,7,0.9)';label='📡 RADIO 7600';emoji='✈'}
+          else if(squawk==='7500'){type='🔴 Kaping';kleur='#ff006e';glow='rgba(255,0,110,1)';label='🔴 KAPING 7500';emoji='🚨'}
+          else if(/^(SAMU|SMUR|MED|HEMS|LIFEGUARD)/i.test(call)){type='Medisch';kleur='#ffffff';glow='rgba(255,255,255,0.8)';label='🏥 MEDISCH';emoji='🚁'}
+
+          var grootte=type==='civiel'?'14px':'16px';
+          var icn=L.divIcon({className:'',iconAnchor:[10,10],popupAnchor:[0,-12],html:
+            '<div style="transform:rotate('+hdg+'deg);font-size:'+grootte+';max-width:24px;max-height:24px;line-height:1;display:block">'+emoji+'</div>'
+          });
+          var popLabel=label?'<div style="display:inline-block;background:'+kleur+';color:#000;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-bottom:6px;letter-spacing:1px">'+label+'</div><br>':'';
+          var hex=s.hex||'';
+          var popId='ps-'+hex;
+          var m=L.marker([lat,lon],{icon:icn}).addTo(map)
+            .bindPopup('<div style="font-family:sans-serif;min-width:200px">'
+              +(hex?'<div id="'+popId+'" style="margin-bottom:6px"></div>':'')
+              +popLabel
+              +'<b style="color:'+kleur+';font-size:14px">'+call+'</b>'
+              +'<div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.8">'
+              +'Type: '+type+'<br>Hoogte: '+alt+'<br>Snelheid: '+spd+'<br>Koers: '+Math.round(hdg)+'°'
+              +(squawk&&squawk!=='0'?'<br>Squawk: '+squawk:'')
+              +'</div></div>',{maxWidth:240});
+          if(hex){
+            m.on('popupopen',function(){
+              var el=document.getElementById(popId);
+              if(!el||el.dataset.loaded)return;
+              el.dataset.loaded='1';
+              el.innerHTML='<div style="font-size:10px;color:#666;padding:4px 0">📷 foto laden…</div>';
+              fetch('https://api.planespotters.net/pub/photos/hex/'+hex)
+                .then(function(r){return r.json()})
+                .then(function(d){
+                  if(d.photos&&d.photos.length){
+                    var p=d.photos[0];
+                    var src=p.thumbnail_large?p.thumbnail_large.src:p.thumbnail.src;
+                    el.innerHTML='<a href="'+p.link+'" target="_blank" rel="noopener">'
+                      +'<img src="'+src+'" style="width:100%;border-radius:5px;display:block" onerror="this.parentNode.parentNode.style.display=\'none\'">'
+                      +'<div style="font-size:9px;color:#666;margin-top:2px">© '+p.photographer+' · planespotters.net</div>'
+                      +'</a>';
+                  }else{el.style.display='none';}
+                })
+                .catch(function(){el.style.display='none';});
+            });
+          }
+          var id=s.hex||call;
+          gezien[id]=true;
+          if(vliegMarkers[id]){
+            vliegMarkers[id].setLatLng([lat,lon]);
+            vliegMarkers[id].setIcon(icn);
+          } else {
+            vliegCluster.addLayer(m);
+            vliegMarkers[id]=m;
+          }
+        });
+        // Verwijder verdwenen vliegtuigen
+        Object.keys(vliegMarkers).forEach(function(k){
+          if(!gezien[k]){vliegCluster.removeLayer(vliegMarkers[k]);delete vliegMarkers[k];}
+        });
+        document.getElementById('vluchtteller').textContent=Object.keys(vliegMarkers).length+' vliegtuigen boven België';
+      }).catch(function(){});
+  }
+  laadVluchten();
+  setInterval(laadVluchten,20000);
+
+  // Militaire vluchten via ADS-B Exchange
+  var milMarkers={};
+  function laadMilitair(){
+    // Sleutel staat veilig op de server — zie api/militair.js
+    fetch('https://belgie-vliegt.vercel.app/api/militair')
+    .then(function(r){return r.json()})
+    .then(function(data){
+      if(!data.ac)return;
+      var gezien={};
+      data.ac.forEach(function(s){
+        if(!s.military)return;
+        var lat=s.lat,lon=s.lon;
+        if(!lat||!lon)return;
+        var call=(s.flight||s.r||'?').trim();
+        var hdg=s.track||0;
+        var alt=s.alt_baro?Math.round(s.alt_baro*0.3048)+'m':'?';
+        var spd=s.gs?Math.round(s.gs*1.852)+'km/u':'?';
+        var hex=s.hex||call;
+        var type=s.t||'Militair';
+
+        var icn=L.divIcon({className:'',iconAnchor:[12,12],popupAnchor:[0,-14],html:
+          '<div style="transform:rotate('+hdg+'deg);font-size:18px;line-height:1;filter:drop-shadow(0 0 4px rgba(230,57,70,0.9))">🪖</div>'
+        });
+
+        var popHtml='<div style="font-family:sans-serif;min-width:200px">'
+          +'<div style="display:inline-block;background:#e63946;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;margin-bottom:6px;letter-spacing:1px">⚔️ MILITAIR</div><br>'
+          +'<b style="color:#e63946;font-size:14px">'+call+'</b>'
+          +'<div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.8">'
+          +'Type: '+type+'<br>Hoogte: '+alt+'<br>Snelheid: '+spd+'<br>Koers: '+Math.round(hdg)+'°'
+          +'</div></div>';
+
+        gezien[hex]=true;
+        if(milMarkers[hex]){
+          milMarkers[hex].setLatLng([lat,lon]);
+          milMarkers[hex].setIcon(icn);
+        } else {
+          var m=L.marker([lat,lon],{icon:icn}).addTo(map).bindPopup(popHtml,{maxWidth:240});
+          milMarkers[hex]=m;
+        }
+      });
+      Object.keys(milMarkers).forEach(function(k){
+        if(!gezien[k]){map.removeLayer(milMarkers[k]);delete milMarkers[k];}
+      });
+    }).catch(function(){});
+  }
+  laadMilitair();
+  setInterval(laadMilitair,30000);
+
+  // GPS blauwe locatie
+  var gpsMarker=null,gpsCircle=null,gpsPulse=null,gpsPulseTimer=null;
+  window.kaartMap=map;
+  window.toonLocatie=function(lat,lon,acc){
+    if(gpsPulseTimer){clearInterval(gpsPulseTimer);gpsPulseTimer=null;}
+    if(gpsMarker){map.removeLayer(gpsMarker);gpsMarker=null;}
+    if(gpsCircle){map.removeLayer(gpsCircle);gpsCircle=null;}
+    if(gpsPulse){map.removeLayer(gpsPulse);gpsPulse=null;}
+    gpsCircle=L.circle([lat,lon],{radius:acc,color:'#4285f4',fillColor:'#4285f4',fillOpacity:0.08,weight:1,interactive:false}).addTo(map);
+    gpsPulse=L.circleMarker([lat,lon],{radius:10,color:'#4285f4',weight:2,fillOpacity:0,interactive:false}).addTo(map);
+    var pr=10;
+    gpsPulseTimer=setInterval(function(){
+      pr+=1;
+      gpsPulse.setRadius(pr).setStyle({opacity:Math.max(0,0.9*(1-(pr-10)/26))});
+      if(pr>=36)pr=10;
+    },40);
+    gpsMarker=L.circleMarker([lat,lon],{radius:9,color:'#fff',weight:2.5,fillColor:'#4285f4',fillOpacity:1,zIndexOffset:1000}).addTo(map)
+      .bindPopup('<b style="color:#4285f4">U bent hier</b><br><span style="font-size:11px;color:#aaa">Nauwkeurigheid: ~'+Math.round(acc)+'m</span>');
+  }
+  fetch('https://ipwho.is/')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.latitude)toonLocatie(d.latitude,d.longitude,2000);
+      else throw new Error();
+    })
+    .catch(function(){
+      fetch('https://ip-api.com/json/')
+        .then(function(r){return r.json()})
+        .then(function(d){if(d.lat)toonLocatie(d.lat,d.lon,3000);})
+        .catch(function(){});
+    });
+
+  // NAVO routes
+  var routes=[
+    {pts:[[50.9333,4.4667],[52.3608,5.7017]],naam:'Melsbroek → Eindhoven (dagelijkse pendel)'},
+    {pts:[[50.9333,4.4667],[49.4369,7.6003]],naam:'Melsbroek → Ramstein (NAVO logistiek)'},
+    {pts:[[51.1681,5.4700],[51.5500,4.8000]],naam:'Kleine Brogel → oefengebied Noordzee'},
+    {pts:[[51.1681,5.4700],[50.2667,5.1167]],naam:'Kleine Brogel ↔ Florennes (samenwerking)'},
+  ];
+  routes.forEach(function(r){
+    L.polyline(r.pts,{color:'#C8972A',weight:2,opacity:0.6,dashArray:'6 4'}).addTo(map)
+     .bindPopup('<span style="font-size:12px;color:#C8972A">'+r.naam+'</span>');
+  });
+})();
+
+var lezing=false;
+document.getElementById('leesbtn').onclick=function(){
+  // Unlock audio context first
+  var a=new(window.AudioContext||window.webkitAudioContext)();
+  var o=a.createOscillator();o.connect(a.destination);o.start();o.stop(a.currentTime+0.001);
+  lezing=!lezing;
+  if(lezing)leesAlles();else stopLezen();
+};
+</script>
+</body>
+</html>
