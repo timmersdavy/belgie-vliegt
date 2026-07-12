@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl --ssl-no-revoke -X POST https://timmersdavy.app.n8n.cloud/webhook/b507152d-0baf-4587-85b9-85fa12959715 -H 'Content-Type: application/json' -d '{\"project\": \"belgie-vliegt\", \"status\": \"afgerond\", \"timestamp\": \"'$(date -Iseconds)'\"}'"
+          }
+        ]
+      }
+    ]
+  }
+}
